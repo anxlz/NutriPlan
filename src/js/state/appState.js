@@ -1,6 +1,17 @@
 // Storage Key
 let STORAGE_KEY = "nutriplan_foodlog_v1";
 
+// Days Array
+let DAYS_OF_WEEK = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
 // Date Formatter
 function formatDateKey(date = new Date()) {
   let year = date.getFullYear();
@@ -11,25 +22,27 @@ function formatDateKey(date = new Date()) {
 
 // Load Database
 function loadDatabase() {
-  let data = localStorage.getItem(STORAGE_KEY);
-  // console.log("loaded");
-  return JSON.parse(data) || {};
+  let storedData = localStorage.getItem(STORAGE_KEY);
+  console.log("loaded");
+  return JSON.parse(storedData) || {};
 }
 
 // Save Database
 function saveDatabase(database) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(database));
-  // console.log("saved");
+  console.log("saved");
 }
 
 // State Manager
 export let appState = {
   currentPage: "meals",
   activeMealId: null,
+  currentNutrition: null,
+  currentProducts: [],
 
   // Get Key
   getDayKey(date = new Date()) {
-    // console.log("key");
+    console.log("key");
     return formatDateKey(date);
   },
 
@@ -38,7 +51,7 @@ export let appState = {
     let database = loadDatabase();
     let dateKey = formatDateKey(date);
     let items = database[dateKey] || [];
-    // console.log("items");
+    console.log("items");
     return items;
   },
 
@@ -61,7 +74,7 @@ export let appState = {
     itemsList.unshift(newItem);
     database[dateKey] = itemsList;
     saveDatabase(database);
-    // console.log("added");
+    console.log("added");
     return newItem;
   },
 
@@ -71,7 +84,7 @@ export let appState = {
     let dateKey = formatDateKey(date);
     database[dateKey] = [];
     saveDatabase(database);
-    // console.log("cleared");
+    console.log("cleared");
   },
 
   // Weekly Summary
@@ -84,7 +97,7 @@ export let appState = {
       currentDate.setDate(currentDate.getDate() - dayIndex);
       let dateKey = formatDateKey(currentDate);
       let dayItems = database[dateKey] || [];
-      
+
       let dayTotals = dayItems.reduce(
         (totals, item) => {
           totals.calories += Number(item.calories || 0);
@@ -99,7 +112,7 @@ export let appState = {
       weeklyData.push({ date: dateKey, ...dayTotals });
     }
 
-    // console.log("weekly");
+    console.log("weekly");
     return weeklyData;
   },
 
@@ -115,7 +128,31 @@ export let appState = {
     saveDatabase(database);
 
     let wasDeleted = filteredList.length !== itemsList.length;
-    // console.log("deleted");
+    console.log("deleted");
     return wasDeleted;
+  },
+
+  // Set Nutrition
+  setCurrentNutrition(nutritionData) {
+    this.currentNutrition = nutritionData;
+    console.log("nutrition");
+  },
+
+  // Get Nutrition
+  getCurrentNutrition() {
+    console.log("getting");
+    return this.currentNutrition;
+  },
+
+  // Set Products
+  setCurrentProducts(productsData) {
+    this.currentProducts = productsData;
+    console.log("products");
+  },
+
+  // Get Products
+  getCurrentProducts() {
+    console.log("getting");
+    return this.currentProducts;
   },
 };
