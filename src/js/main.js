@@ -41,19 +41,30 @@ import {
   showProductsSpinner,
   showSuccessAlert,
   showErrorAlert,
+  renderFoodLog,
+  renderWeeklyChart,
 } from "./ui/components.js";
 
 // Initialize App
 async function initializeApp() {
   console.log("init");
   
+  // Create modal containers
+  createModalContainers();
+  
   // Show Loaders
   showGeneralLoader();
   showMealsSpinner();
 
+  // Hide sections initially
+  hideAllSections();
+  
+  // Show meals sections only
+  navigateToSection("#search-filters-section, #meal-categories-section, #all-recipes-section");
+  activateSidebarLink(0);
+
   // Load Data
   let areasData = await getAreas();
-  // console.log(areasData)
   let categoriesData = await getCategories();
   let randomMealsData = await getRandomMeals(25);
 
@@ -181,8 +192,23 @@ function bindSidebarEvents() {
   for (let item of sidebarItems) {
     item.addEventListener("click", function () {
       hideAllSections();
-      navigateToSection(item.getAttribute("data-sections"));
-      activateSidebarLink(Array.from(sidebarItems).indexOf(item));
+      
+      let itemIndex = Array.from(sidebarItems).indexOf(item);
+      
+      // Navigate based on index
+      if (itemIndex === 0) {
+        // Meals & Recipes
+        navigateToSection("#search-filters-section, #meal-categories-section, #all-recipes-section");
+      } else if (itemIndex === 1) {
+        // Product Scanner
+        navigateToSection("#products-section");
+      } else if (itemIndex === 2) {
+        // Food Log
+        navigateToSection("#foodlog-section");
+        updateFoodLogDisplay();
+      }
+      
+      activateSidebarLink(itemIndex);
     });
   }
 }
@@ -228,7 +254,7 @@ function bindMealCardEvents() {
             ingredients: ingredientsList,
           });
 
-          if (nutritionData.data) {
+          if (nutritionData.status && nutritionData.data) {
             nutritionData.data.id = mealData.id;
             nutritionData.data.recipeName = mealData.data[0].name;
             nutritionData.data.image = mealData.data[0].thumbnail;
@@ -236,7 +262,7 @@ function bindMealCardEvents() {
             renderNutritionCalculations(nutritionData.data);
             bindMealLogEvent();
           } else {
-            showServerError(nutritionData.message);
+            showServerError(nutritionData.message || "Analysis failed");
           }
         } catch {
           showServerError(nutritionData.message);
@@ -260,9 +286,7 @@ function bindBackButtonEvent() {
     async function handleBackClick() {
       if (backButton) {
         hideAllSections();
-        navigateToSection(
-          "#all-recipes-section, #meal-categories-section, #search-filters-section"
-        );
+        navigateToSection("#all-recipes-section, #meal-categories-section, #search-filters-section");
         activateSidebarLink(0);
       }
     }
@@ -282,7 +306,9 @@ function bindMealLogEvent() {
     showMealLogModal(currentNutrition);
 
     let confirmButton = document.querySelector("#confirm-log-meal");
-    confirmButton.addEventListener("click", function () {
+    let cancelButton = document.querySelector("#cancel-log-meal");
+    
+    let handleConfirm = function () {
       let servingsInput = document.getElementById("meal-servings");
       let servingsValue = Number(servingsInput.value);
 
@@ -290,20 +316,39 @@ function bindMealLogEvent() {
       hideMealLogModal();
 
       if (logResult) {
-        showSuccessAlert("Food Logged Successfully");
+        Swal.fire({
+          icon: "success",
+          title: "Success",
+          text: "Food Logged Successfully",
+          allowOutsideClick: false,
+        }).then(() => {
+          hideAllSections();
+          navigateToSection("#foodlog-section");
+          activateSidebarLink(2);
+          updateFoodLogDisplay();
+        });
       } else {
         showErrorAlert("Failed to log food");
       }
-    });
+      
+      confirmButton.removeEventListener("click", handleConfirm);
+      cancelButton.removeEventListener("click", handleCancel);
+    };
 
-    let cancelButton = document.querySelector("#cancel-log-meal");
-    cancelButton.addEventListener("click", function () {
+    let handleCancel = function () {
       hideMealLogModal();
-    });
+      confirmButton.removeEventListener("click", handleConfirm);
+      cancelButton.removeEventListener("click", handleCancel);
+    };
+    
+    confirmButton.addEventListener("click", handleConfirm);
+    cancelButton.addEventListener("click", handleCancel);
 
     document.querySelector("#log-meal-modal").addEventListener("click", function (event) {
       if (event.target.getAttribute("id") === "log-meal-modal") {
         hideMealLogModal();
+        confirmButton.removeEventListener("click", handleConfirm);
+        cancelButton.removeEventListener("click", handleCancel);
       }
     });
   });
@@ -318,11 +363,21 @@ function bindProductEvents() {
 
   searchProductButton.addEventListener("click", function () {
     async function handleProductSearch() {
+      if (!productSearchInput.value.trim()) {
+        showErrorAlert("Please enter a product name");
+        return;
+      }
+      
       showProductsSpinner();
       let productsData = await searchProducts(productSearchInput.value);
-      appState.setCurrentProducts(productsData);
-      renderProducts(productsData);
-      bindProductCardEvents();
+      
+      if (productsData.status) {
+        appState.setCurrentProducts(productsData);
+        renderProducts(productsData);
+        bindProductCardEvents();
+      } else {
+        showErrorAlert(productsData.message || "Search failed");
+      }
     }
 
     handleProductSearch();
@@ -333,12 +388,22 @@ function bindProductEvents() {
 
   barcodeButton.addEventListener("click", function () {
     async function handleBarcodeSearch() {
+      if (!barcodeInput.value.trim()) {
+        showErrorAlert("Please enter a barcode");
+        return;
+      }
+      
       showProductsSpinner();
       let productData = await getProductByBarcode(barcodeInput.value);
-      let productsWrapper = { data: [productData.result] };
-      appState.setCurrentProducts(productsWrapper);
-      renderProducts(productsWrapper);
-      bindProductCardEvents();
+      
+      if (productData.status && productData.result) {
+        let productsWrapper = { status: true, data: [productData.result] };
+        appState.setCurrentProducts(productsWrapper);
+        renderProducts(productsWrapper);
+        bindProductCardEvents();
+      } else {
+        showErrorAlert(productData.message || "Barcode not found");
+      }
     }
 
     handleBarcodeSearch();
@@ -355,12 +420,16 @@ function bindProductCategoryEvents() {
     button.addEventListener("click", function () {
       async function handleCategoryClick() {
         showProductsSpinner();
-        let productsData = await getProductsByCategory(
-          button.getAttribute("data-category")
-        );
-        appState.setCurrentProducts(productsData);
-        renderProducts(productsData);
-        bindProductCardEvents();
+        let categoryName = button.getAttribute("data-category");
+        let productsData = await getProductsByCategory(categoryName);
+        
+        if (productsData.status) {
+          appState.setCurrentProducts(productsData);
+          renderProducts(productsData);
+          bindProductCardEvents();
+        } else {
+          showErrorAlert("Failed to load products");
+        }
       }
 
       handleCategoryClick();
@@ -390,27 +459,55 @@ function bindProductCardEvents() {
       showProductModal(currentProduct);
 
       let confirmButton = document.querySelector(".add-product-to-log");
-      confirmButton.addEventListener("click", function () {
+      let closeButtons = document.querySelectorAll(".close-product-modal");
+      
+      let handleConfirm = function () {
         let logResult = logProductToStorage(currentProduct);
         hideProductModal();
 
         if (logResult) {
-          showSuccessAlert("Food Logged Successfully");
+          Swal.fire({
+            icon: "success",
+            title: "Success",
+            text: "Food Logged Successfully",
+            allowOutsideClick: false,
+          }).then(() => {
+            hideAllSections();
+            navigateToSection("#foodlog-section");
+            activateSidebarLink(2);
+            updateFoodLogDisplay();
+          });
         } else {
           showErrorAlert("Failed to log product");
         }
-      });
-
-      let closeButtons = document.querySelectorAll(".close-product-modal");
+        
+        confirmButton.removeEventListener("click", handleConfirm);
+        for (let btn of closeButtons) {
+          btn.removeEventListener("click", handleClose);
+        }
+      };
+      
+      let handleClose = function () {
+        hideProductModal();
+        confirmButton.removeEventListener("click", handleConfirm);
+        for (let btn of closeButtons) {
+          btn.removeEventListener("click", handleClose);
+        }
+      };
+      
+      confirmButton.addEventListener("click", handleConfirm);
+      
       for (let btn of closeButtons) {
-        btn.addEventListener("click", function () {
-          hideProductModal();
-        });
+        btn.addEventListener("click", handleClose);
       }
 
       document.querySelector("#product-detail-modal").addEventListener("click", function (event) {
         if (event.target.getAttribute("id") === "product-detail-modal") {
           hideProductModal();
+          confirmButton.removeEventListener("click", handleConfirm);
+          for (let btn of closeButtons) {
+            btn.removeEventListener("click", handleClose);
+          }
         }
       });
     });
@@ -420,10 +517,101 @@ function bindProductCardEvents() {
 // Food Log
 function bindFoodLogEvents() {
   console.log("binding");
-  // Will implement in next part
+  
+  let clearButton = document.querySelector("#clear-foodlog");
+  if (clearButton) {
+    clearButton.addEventListener("click", function () {
+      Swal.fire({
+        title: "Are you sure?",
+        text: "You won't be able to revert this!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#d33",
+        confirmButtonText: "Yes, delete it!"
+      }).then((result) => {
+        if (result.isConfirmed) {
+          appState.clearDayLog();
+          updateFoodLogDisplay();
+          Swal.fire({
+            title: "Deleted!",
+            text: "All items have been cleared.",
+            icon: "success"
+          });
+        }
+      });
+    });
+  }
+
+  // Delete buttons
+  document.addEventListener("click", function (event) {
+    let deleteButton = event.target.closest("[data-action='delete-log']");
+    if (deleteButton) {
+      let itemId = deleteButton.getAttribute("data-id");
+      appState.deleteFromDayLog(itemId);
+      updateFoodLogDisplay();
+    }
+  });
+}
+
+// Update Food Log
+function updateFoodLogDisplay() {
+  console.log("updating");
+  
+  let todayItems = appState.getDayLog();
+  let weeklyData = appState.getLast7DaysSummary();
+
+  let totals = todayItems.reduce(
+    (sum, item) => ({
+      calories: sum.calories + Number(item.calories || 0),
+      protein: sum.protein + Number(item.protein || 0),
+      carbs: sum.carbs + Number(item.carbs || 0),
+      fat: sum.fat + Number(item.fat || 0),
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  );
+
+  let targets = {
+    calories: 2000,
+    protein: 50,
+    carbs: 250,
+    fat: 65,
+  };
+
+  renderFoodLog(
+    {
+      foodlogTodaySection: document.querySelector("#foodlog-today-section"),
+      clearFoodlogBtn: document.querySelector("#clear-foodlog"),
+      loggedItemsList: document.querySelector("#logged-items-list"),
+    },
+    { items: todayItems, totals, targets }
+  );
+
+  renderWeeklyChart("weekly-chart", weeklyData);
 }
 
 /* Helper Functions */
+
+// Create Modals
+function createModalContainers() {
+  console.log("modals");
+  
+  // Meal Log Modal
+  if (!document.querySelector("#log-meal-modal")) {
+    let mealModal = document.createElement("div");
+    mealModal.id = "log-meal-modal";
+    mealModal.className = "fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center hidden";
+    document.body.appendChild(mealModal);
+  }
+  
+  // Product Detail Modal
+  if (!document.querySelector("#product-detail-modal")) {
+    let productModal = document.createElement("div");
+    productModal.id = "product-detail-modal";
+    productModal.className = "fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center hidden";
+    document.body.appendChild(productModal);
+  }
+}
 
 // Log Meal
 function logMealToStorage(nutritionData, servings) {
@@ -473,22 +661,56 @@ function logProductToStorage(productData) {
 function showMealLogModal(nutritionData) {
   console.log("modal");
   let modalElement = document.querySelector("#log-meal-modal");
-  console.log(nutritionData);
   modalElement.classList.remove("hidden");
   modalElement.innerHTML = `
     <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
-      <h3 class="text-xl font-bold mb-4">{nutritionData.recipeName}</h3>
-      <label class="block mb-4">
-        <span class="text-sm font-semibold">Servings</span>
-        <input type="number" id="meal-servings" value="1" min="0.5" max="10" step="0.5" class="w-full mt-2 px-4 py-2 border rounded-lg"/>
-      </label>
+      <div class="flex items-center gap-4 mb-6">
+        <img src="${nutritionData.image}" alt="${nutritionData.recipeName}" class="w-16 h-16 rounded-xl object-cover">
+        <div>
+          <h3 class="text-xl font-bold text-gray-900">Log This Meal</h3>
+          <p class="text-gray-500 text-sm">${nutritionData.recipeName}</p>
+        </div>
+      </div>
+      
+      <div class="mb-6">
+        <label class="block text-sm font-semibold text-gray-700 mb-2">Number of Servings</label>
+        <div class="flex items-center gap-3">
+          <input type="number" id="meal-servings" value="1" min="0.5" max="10" step="0.5" class="w-20 text-center text-xl font-bold border-2 border-gray-200 rounded-lg py-2">
+        </div>
+      </div>
+      
+      <div class="bg-emerald-50 rounded-xl p-4 mb-6">
+        <p class="text-sm text-gray-600 mb-2">Estimated nutrition per serving:</p>
+        <div class="grid grid-cols-4 gap-2 text-center">
+          <div>
+            <p class="text-lg font-bold text-emerald-600">${nutritionData.perServing.calories}</p>
+            <p class="text-xs text-gray-500">Calories</p>
+          </div>
+          <div>
+            <p class="text-lg font-bold text-blue-600">${nutritionData.perServing.protein}g</p>
+            <p class="text-xs text-gray-500">Protein</p>
+          </div>
+          <div>
+            <p class="text-lg font-bold text-amber-600">${nutritionData.perServing.carbs}g</p>
+            <p class="text-xs text-gray-500">Carbs</p>
+          </div>
+          <div>
+            <p class="text-lg font-bold text-purple-600">${nutritionData.perServing.fat}g</p>
+            <p class="text-xs text-gray-500">Fat</p>
+          </div>
+        </div>
+      </div>
+      
       <div class="flex gap-3">
-        <button id="cancel-log-meal" class="flex-1 py-3 bg-gray-100 rounded-xl">Cancel</button>
-        <button id="confirm-log-meal" class="flex-1 py-3 bg-blue-600 text-white rounded-xl">Log Meal</button>
+        <button id="cancel-log-meal" class="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all">
+          Cancel
+        </button>
+        <button id="confirm-log-meal" class="flex-1 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all">
+          <i class="fa-solid fa-clipboard-list mr-2"></i>Log Meal
+        </button>
       </div>
     </div>`;
 }
-// Meal has been logged
 
 // Hide Modal
 function hideMealLogModal() {
