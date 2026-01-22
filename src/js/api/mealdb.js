@@ -1,41 +1,20 @@
-// API Config
-let API_BASE_URL = "https://nutriplan-api.vercel.app/api";
-let USDA_API_KEY = "ugVYTdbTbTi0OZC3FuUnlh1jbC8SHBZMeKcpDzeI";
-
-// Request Handler
-async function apiRequest(endpoint, options = {}) {
-  let response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    headers: {
-      accept: "application/json",
-      ...(options.headers || {}),
-    },
-    ...options,
-  });
-
-  if (!response.ok) {
-    let errorMessage = `API error: ${response.status}`;
-    console.log("error");
-    throw new Error(errorMessage);
-  }
-
-  console.log("fetched");
-  return response.json();
-}
+// API Configuration
+let baseApiUrl = "https://nutriplan-api.vercel.app/api";
 
 // Generic Fetcher
-async function fetchMealsData(url, method = "GET") {
+async function fetchApiData(url, method = "GET") {
   let resultObject = {};
   try {
     let shouldRetry = true;
 
     while (shouldRetry) {
-      let response = await fetch(url, { method: method });
-      let responseData = await response.json();
+      let apiResponse = await fetch(url, { method: method });
+      let responseData = await apiResponse.json();
 
-      resultObject.status = response.ok;
+      resultObject.status = apiResponse.ok;
       resultObject.data = [];
 
-      if (response.ok) {
+      if (apiResponse.ok) {
         shouldRetry = false;
         resultObject.message = "";
         resultObject.data = responseData.results;
@@ -58,16 +37,18 @@ async function fetchMealsData(url, method = "GET") {
 export async function getAreas() {
   console.log("areas");
   try {
-    let response = await fetch(`${API_BASE_URL}/meals/areas`, {
-      method: "GET",
-    });
-    // console.log('meal DB');
-    let responseData = await response.json();
+    let apiResponse = await fetch(`${baseApiUrl}/meals/areas`, { method: "GET" });
+    let responseData = await apiResponse.json();
 
-    if (response.ok) return responseData.results;
-    else return [];
+    if (apiResponse.ok) {
+      console.log("success");
+      return responseData.results;
+    } else {
+      console.log("failed");
+      return [];
+    }
   } catch (error) {
-    console.log("error ==>", error);
+    console.log("error");
     return [];
   }
 }
@@ -76,13 +57,16 @@ export async function getAreas() {
 export async function getCategories() {
   console.log("categories");
   try {
-    let response = await fetch(`${API_BASE_URL}/meals/categories`, {
-      method: "GET",
-    });
-    let responseData = await response.json();
+    let apiResponse = await fetch(`${baseApiUrl}/meals/categories`, { method: "GET" });
+    let responseData = await apiResponse.json();
 
-    if (response.ok) return responseData.results;
-    else return [];
+    if (apiResponse.ok) {
+      console.log("success");
+      return responseData.results;
+    } else {
+      console.log("failed");
+      return [];
+    }
   } catch (error) {
     console.log("error");
     return [];
@@ -90,39 +74,27 @@ export async function getCategories() {
 }
 
 // Random Meals
-export async function getRandomMeals(count) {
+export async function getRandomMeals(mealsCount) {
   console.log("random");
-  return fetchMealsData(
-    `${API_BASE_URL}/meals/random?count=${count}`,
-    "GET"
-  );
+  return fetchApiData(`${baseApiUrl}/meals/random?count=${mealsCount}`, "GET");
 }
 
 // Filter Area
 export async function getMealsByArea(areaName) {
   console.log("filtering");
-  return fetchMealsData(
-    `${API_BASE_URL}/meals/filter?area=${areaName}&limit=25`,
-    "GET"
-  );
+  return fetchApiData(`${baseApiUrl}/meals/filter?area=${areaName}&limit=25`, "GET");
 }
 
 // Filter Category
 export async function getMealsByCategory(categoryName) {
   console.log("filtering");
-  return fetchMealsData(
-    `${API_BASE_URL}/meals/filter?category=${categoryName}&limit=25`,
-    "GET"
-  );
+  return fetchApiData(`${baseApiUrl}/meals/filter?category=${categoryName}&limit=25`, "GET");
 }
 
 // Search Meals
-export async function searchMeals(query) {
+export async function searchMeals(searchQuery) {
   console.log("searching");
-  return fetchMealsData(
-    `${API_BASE_URL}/meals/search?q=${query}`,
-    "GET"
-  );
+  return fetchApiData(`${baseApiUrl}/meals/search?q=${searchQuery}`, "GET");
 }
 
 // Get Meal
@@ -130,15 +102,13 @@ export async function getMealById(mealId) {
   console.log("meal");
   let resultObject = {};
   try {
-    let response = await fetch(`${API_BASE_URL}/meals/${mealId}`, {
-      method: "GET",
-    });
-    let responseData = await response.json();
+    let apiResponse = await fetch(`${baseApiUrl}/meals/${mealId}`, { method: "GET" });
+    let responseData = await apiResponse.json();
 
-    resultObject.status = response.ok;
+    resultObject.status = apiResponse.ok;
     resultObject.data = [];
 
-    if (response.ok) {
+    if (apiResponse.ok) {
       resultObject.data.push(responseData.result);
       resultObject.message = "Success";
       console.log("loaded");
@@ -154,40 +124,109 @@ export async function getMealById(mealId) {
 }
 
 // Search Products
-export async function searchProducts(query) {
+export async function searchProducts(searchQuery) {
   console.log("products");
-  return apiRequest(`/products/search?q=${query}`);
+  try {
+    let apiResponse = await fetch(`${baseApiUrl}/products/search?q=${searchQuery}`, { method: "GET" });
+    let responseData = await apiResponse.json();
+
+    if (apiResponse.ok) {
+      console.log("success");
+      return { status: true, data: responseData.results };
+    } else {
+      console.log("failed");
+      return { status: false, data: [], message: "Search failed" };
+    }
+  } catch (error) {
+    console.log("error");
+    return { status: false, data: [], message: error.message };
+  }
 }
 
 // Get Barcode
 export async function getProductByBarcode(barcode) {
   console.log("barcode");
-  return apiRequest(`/products/barcode/${encodeURIComponent(barcode)}`);
+  try {
+    let apiResponse = await fetch(`${baseApiUrl}/products/barcode/${encodeURIComponent(barcode)}`, { method: "GET" });
+    let responseData = await apiResponse.json();
+
+    if (apiResponse.ok) {
+      console.log("success");
+      return { status: true, result: responseData.result };
+    } else {
+      console.log("failed");
+      return { status: false, result: null, message: "Barcode not found" };
+    }
+  } catch (error) {
+    console.log("error");
+    return { status: false, result: null, message: error.message };
+  }
 }
 
 // Product Categories
 export async function getProductCategories() {
   console.log("categories");
-  return apiRequest(`/products/categories?page=1&limit=12`);
+  try {
+    let apiResponse = await fetch(`${baseApiUrl}/products/categories?page=1&limit=12`, { method: "GET" });
+    let responseData = await apiResponse.json();
+
+    if (apiResponse.ok) {
+      console.log("success");
+      return { status: true, results: responseData.results };
+    } else {
+      console.log("failed");
+      return { status: false, results: [] };
+    }
+  } catch (error) {
+    console.log("error");
+    return { status: false, results: [] };
+  }
 }
 
 // Category Products
 export async function getProductsByCategory(categoryName) {
   console.log("filtering");
-  return apiRequest(
-    `/products/category/${categoryName}?page=1&limit=24`
-  );
+  try {
+    let apiResponse = await fetch(`${baseApiUrl}/products/category/${encodeURIComponent(categoryName)}?page=1&limit=24`, { method: "GET" });
+    let responseData = await apiResponse.json();
+
+    if (apiResponse.ok) {
+      console.log("success");
+      return { status: true, data: responseData.results };
+    } else {
+      console.log("failed");
+      return { status: false, data: [] };
+    }
+  } catch (error) {
+    console.log("error");
+    return { status: false, data: [] };
+  }
 }
 
 // Analyze Nutrition
 export async function analyzeMealNutrition({ title, ingredients } = {}) {
   console.log("analyzing");
-  return apiRequest(`/nutrition/analyze`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": USDA_API_KEY,
-    },
-    body: JSON.stringify({ title, ingredients }),
-  });
+  try {
+    let apiResponse = await fetch(`${baseApiUrl}/nutrition/analyze`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": "ugVYTdbTbTi0OZC3FuUnlh1jbC8SHBZMeKcpDzeI",
+      },
+      body: JSON.stringify({ title, ingredients }),
+    });
+
+    let responseData = await apiResponse.json();
+
+    if (apiResponse.ok) {
+      console.log("success");
+      return { status: true, data: responseData.data };
+    } else {
+      console.log("failed");
+      return { status: false, data: null, message: responseData.error?.message || "Analysis failed" };
+    }
+  } catch (error) {
+    console.log("error");
+    return { status: false, data: null, message: error.message };
+  }
 }
