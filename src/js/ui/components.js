@@ -14,36 +14,12 @@ let CATEGORY_COLORS = [
   { from: "lime", to: "green" },
 ];
 
-// Days Names
-let DAYS_NAMES = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
-
-// Months Names
-let MONTHS_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
 // View Buttons
 let listViewButton = document.querySelector("#list-view-btn");
 let gridViewButton = document.querySelector("#grid-view-btn");
+
+// View Handlers
+let viewHandlersAttached = false;
 
 // Skeleton Loader
 export function skeletonCards(count = 8) {
@@ -59,21 +35,10 @@ export function skeletonCards(count = 8) {
     .join("");
 }
 
-// HTML Escape
-export function escapeHtml(htmlString) {
-  return String(htmlString ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
 // Show Areas
 export function renderAreas(areasList) {
   console.log("areas");
   let areasContainer = document.querySelector("#area-filter");
-  // console.log(areasContainer);
   let htmlContent = `
     <button class="area-filter-btn px-4 py-2 bg-emerald-600 text-white rounded-full font-medium text-sm whitespace-nowrap hover:bg-emerald-700 hover:text-white transition-all" data-area="">
       All Recipes
@@ -181,35 +146,45 @@ export function renderMeals(mealsData) {
 // List View
 export function enableListView() {
   console.log("list");
-  let mealCards = document.querySelectorAll(".recipe-card");
+  
+  if (!viewHandlersAttached) {
+    listViewButton.addEventListener("click", function () {
+      console.log("switching");
+      let mealCards = document.querySelectorAll(".recipe-card");
+      
+      listViewButton.classList.add("rounded-md", "bg-white", "shadow-sm");
+      gridViewButton.classList.remove("rounded-md", "bg-white", "shadow-sm");
 
-  listViewButton.addEventListener("click", function () {
-    listViewButton.classList.add("rounded-md", "bg-white", "shadow-sm");
-    gridViewButton.classList.remove("rounded-md", "bg-white", "shadow-sm");
-
-    for (let card of mealCards) {
-      card.classList.add("flex", "flex-row", "h-40");
-      card.querySelector("div").classList.add("h-full");
-      card.querySelector("div").querySelector("div").classList.add("hidden");
-    }
-  });
+      for (let card of mealCards) {
+        card.classList.add("flex", "flex-row", "h-40");
+        card.querySelector("div").classList.add("h-full");
+        card.querySelector("div").querySelector("div").classList.add("hidden");
+      }
+    });
+  }
 }
 
 // Grid View
 export function enableGridView() {
   console.log("grid");
-  let mealCards = document.querySelectorAll(".recipe-card");
+  
+  if (!viewHandlersAttached) {
+    gridViewButton.addEventListener("click", function () {
+      console.log("switching");
+      let mealCards = document.querySelectorAll(".recipe-card");
+      
+      gridViewButton.classList.add("rounded-md", "bg-white", "shadow-sm");
+      listViewButton.classList.remove("rounded-md", "bg-white", "shadow-sm");
 
-  gridViewButton.addEventListener("click", function () {
-    gridViewButton.classList.add("rounded-md", "bg-white", "shadow-sm");
-    listViewButton.classList.remove("rounded-md", "bg-white", "shadow-sm");
-
-    for (let card of mealCards) {
-      card.classList.remove("flex", "flex-row", "h-40");
-      card.querySelector("div").classList.remove("h-full");
-      card.querySelector("div").querySelector("div").classList.remove("hidden");
-    }
-  });
+      for (let card of mealCards) {
+        card.classList.remove("flex", "flex-row", "h-40");
+        card.querySelector("div").classList.remove("h-full");
+        card.querySelector("div").querySelector("div").classList.remove("hidden");
+      }
+    });
+    
+    viewHandlersAttached = true;
+  }
 }
 
 // Show Spinner
@@ -548,7 +523,6 @@ export function renderProductCategories(categoriesData) {
   let categoriesContainer = document.querySelector("#product-categories");
   categoriesContainer.innerHTML = "";
 
-  console.log(categoriesData);
   for (let category of categoriesData.results) {
     let randomIndex = Math.round(Math.random() * 11);
     let colorScheme = CATEGORY_COLORS[randomIndex];
@@ -671,4 +645,152 @@ export function showErrorAlert(message) {
     text: message,
     allowOutsideClick: false,
   });
+}
+
+// Food Log
+export function renderFoodLog(domElements, { items, totals, targets }) {
+  console.log("foodlog");
+  
+  // Header
+  let headerElement = domElements.foodlogTodaySection?.querySelector("h4.text-sm.font-semibold");
+  if (headerElement) headerElement.textContent = `Logged Items (${items.length})`;
+
+  // Clear Button
+  if (domElements.clearFoodlogBtn) {
+    domElements.clearFoodlogBtn.style.display = items.length ? "" : "none";
+  }
+
+  // Items List
+  if (domElements.loggedItemsList) {
+    if (!items.length) {
+      domElements.loggedItemsList.innerHTML = `
+        <div class="text-center py-10 text-gray-500">
+          <i class="fa-solid fa-utensils text-4xl mb-3 text-gray-300"></i>
+          <p class="font-medium">No items logged today</p>
+          <p class="text-sm">Add meals from the Meals page, scan products, or add a custom entry</p>
+        </div>
+      `;
+    } else {
+      domElements.loggedItemsList.innerHTML = items
+        .map((logItem) => {
+          let timeString = new Date(logItem.timestamp || logItem.ts).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+
+          let itemTypeLabel =
+            String(logItem.type || "").toLowerCase() === "meal"
+              ? "Recipe"
+              : String(logItem.type || "").toLowerCase() === "product"
+              ? "Product"
+              : "Custom";
+
+          let thumbnailUrl =
+            logItem?.meta?.thumbnail || logItem?.meta?.image || logItem?.thumbnail || "";
+
+          let servingsText = logItem?.meta?.servings
+            ? `${logItem.meta.servings} serving`
+            : "1 serving";
+
+          return `
+            <div class="bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between gap-4">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-12 h-12 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                  ${thumbnailUrl ? `<img src="${thumbnailUrl}" alt="${logItem.name}" class="w-full h-full object-cover" />` : ""}
+                </div>
+                <div class="min-w-0">
+                  <div class="font-semibold text-gray-900 text-sm truncate">${logItem.name}</div>
+                  <div class="text-xs text-gray-500">
+                    ${servingsText} &nbsp;•&nbsp; ${itemTypeLabel}
+                  </div>
+                  <div class="text-xs text-gray-400">${timeString}</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-6 text-xs text-gray-600">
+                <div class="text-right">
+                  <div class="font-semibold text-emerald-700">${Number(logItem.calories || 0)}</div>
+                  <div class="text-[11px] text-gray-400">kcal</div>
+                </div>
+                <div class="text-right">
+                  <div class="font-semibold text-gray-800">${Number(logItem.protein || 0)}<span class="text-[11px] text-gray-400">g</span></div>
+                  <div class="text-[11px] text-gray-400">P</div>
+                </div>
+                <div class="text-right">
+                  <div class="font-semibold text-gray-800">${Number(logItem.carbs || 0)}<span class="text-[11px] text-gray-400">g</span></div>
+                  <div class="text-[11px] text-gray-400">C</div>
+                </div>
+                <div class="text-right">
+                  <div class="font-semibold text-gray-800">${Number(logItem.fat || 0)}<span class="text-[11px] text-gray-400">g</span></div>
+                  <div class="text-[11px] text-gray-400">F</div>
+                </div>
+                <button class="p-2 rounded-lg hover:bg-gray-50 text-gray-500" data-action="delete-log" data-id="${logItem.id}" title="Delete">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+    }
+  }
+
+  // Progress Cards
+  let progressCards = domElements.foodlogTodaySection?.querySelectorAll(".grid > div");
+  if (progressCards && progressCards.length >= 4) {
+    updateProgressCard(progressCards[0], "Calories", totals.calories, targets.calories, "kcal");
+    updateProgressCard(progressCards[1], "Protein", totals.protein, targets.protein, "g");
+    updateProgressCard(progressCards[2], "Carbs", totals.carbs, targets.carbs, "g");
+    updateProgressCard(progressCards[3], "Fat", totals.fat, targets.fat, "g");
+  }
+}
+
+// Progress Card
+function updateProgressCard(cardElement, labelText, currentValue, targetValue, unitText) {
+  let topRow = cardElement.querySelector(".flex.items-center.justify-between");
+  let progressBar = cardElement.querySelector(".w-full.bg-gray-200 > div");
+
+  let titleElement = cardElement.querySelector("h5, .font-semibold, .text-sm.font-semibold");
+  if (titleElement) titleElement.textContent = labelText;
+
+  let valueNum = Number(currentValue) || 0;
+  let targetNum = Number(targetValue) || 0;
+
+  if (topRow) {
+    let rightSpan = topRow.querySelector("span.text-sm.text-gray-500");
+    if (rightSpan) rightSpan.textContent = `${Math.round(valueNum)} / ${targetNum} ${unitText}`;
+  }
+
+  if (progressBar) {
+    let percentage = targetNum > 0 ? Math.min(100, Math.round((valueNum / targetNum) * 100)) : 0;
+    progressBar.style.width = `${percentage}%`;
+  }
+}
+
+// Weekly Chart
+export function renderWeeklyChart(containerId, weekData = []) {
+  console.log("chart");
+  
+  let chartElement =
+    typeof containerId === "string"
+      ? document.getElementById(containerId)
+      : containerId;
+
+  if (!chartElement || !weekData.length || typeof Plotly === "undefined") return;
+
+  let dateLabels = weekData.map((day) => day.date);
+  Plotly.newPlot(
+    chartElement,
+    [
+      { x: dateLabels, y: weekData.map((day) => day.calories), name: "Calories", type: "bar" },
+      { x: dateLabels, y: weekData.map((day) => day.protein), name: "Protein", type: "bar" },
+      { x: dateLabels, y: weekData.map((day) => day.carbs), name: "Carbs", type: "bar" },
+      { x: dateLabels, y: weekData.map((day) => day.fat), name: "Fat", type: "bar" },
+    ],
+    {
+      margin: { t: 20, r: 10, l: 40, b: 40 },
+      barmode: "group",
+      showlegend: true,
+    },
+    { displayModeBar: false, responsive: true }
+  );
 }
