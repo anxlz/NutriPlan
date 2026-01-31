@@ -43,6 +43,7 @@ import {
   showErrorAlert,
   renderFoodLog,
   renderWeeklyChart,
+  initializeSidebar,
 } from "./ui/components.js";
 
 // Initialize App
@@ -51,6 +52,9 @@ async function initializeApp() {
   
   // Create modal containers
   createModalContainers();
+  
+  // Initialize sidebar
+  initializeSidebar();
   
   // Show Loaders
   showGeneralLoader();
@@ -188,7 +192,39 @@ function bindSidebarEvents() {
   console.log("binding");
   
   let sidebarItems = document.querySelectorAll("#sidebar nav ul li");
+  let menuButton = document.querySelector("#header-menu-btn");
+  let closeButton = document.querySelector("#sidebar-close-btn");
+  let sidebarOverlay = document.querySelector("#sidebar-overlay");
+  let sidebarElement = document.querySelector("#sidebar");
 
+  // Toggle sidebar
+  if (menuButton) {
+    menuButton.addEventListener("click", function () {
+      console.log("menu");
+      sidebarElement.classList.toggle("active");
+      sidebarOverlay.classList.toggle("active");
+    });
+  }
+
+  // Close sidebar
+  if (closeButton) {
+    closeButton.addEventListener("click", function () {
+      console.log("close");
+      sidebarElement.classList.remove("active");
+      sidebarOverlay.classList.remove("active");
+    });
+  }
+
+  // Close on overlay click
+  if (sidebarOverlay) {
+    sidebarOverlay.addEventListener("click", function () {
+      console.log("overlay");
+      sidebarElement.classList.remove("active");
+      sidebarOverlay.classList.remove("active");
+    });
+  }
+
+  // Navigation
   for (let item of sidebarItems) {
     item.addEventListener("click", function () {
       hideAllSections();
@@ -209,6 +245,10 @@ function bindSidebarEvents() {
       }
       
       activateSidebarLink(itemIndex);
+      
+      // Close sidebar on mobile
+      sidebarElement.classList.remove("active");
+      sidebarOverlay.classList.remove("active");
     });
   }
 }
