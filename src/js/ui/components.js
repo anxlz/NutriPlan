@@ -21,6 +21,47 @@ let gridViewButton = document.querySelector("#grid-view-btn");
 // View Handlers
 let viewHandlersAttached = false;
 
+// Initialize Sidebar
+export function initializeSidebar() {
+  console.log("sidebar");
+  
+  // Add styles dynamically
+  let styleElement = document.createElement("style");
+  styleElement.textContent = `
+    @media (max-width: 1024px) {
+      #sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease-in-out;
+      }
+      
+      #sidebar.active {
+        transform: translateX(0);
+      }
+      
+      #main-content {
+        margin-left: 0 !important;
+      }
+      
+      .sidebar-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+        z-index: 35;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+      }
+      
+      .sidebar-overlay.active {
+        opacity: 1;
+        visibility: visible;
+      }
+    }
+  `;
+  document.head.appendChild(styleElement);
+}
+
 // Skeleton Loader
 export function skeletonCards(count = 8) {
   console.log("skeleton");
